@@ -38,8 +38,9 @@
   .card h3{margin:0 0 8px;font-size:14px;color:var(--muted);font-weight:600}
   #micBtn{width:100%;padding:12px;font-size:16px}
   #micStatus{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
-  #level{height:6px;background:#ece6da;border-radius:3px;overflow:hidden;margin-top:6px}
+  #level{position:relative;height:8px;background:#ece6da;border-radius:4px;overflow:hidden;margin-top:8px}
   #levelBar{height:100%;width:0;background:#2f9e44;transition:width .05s}
+  #gateMark{position:absolute;top:0;bottom:0;width:2px;background:#2b2a28;opacity:.55;left:0}
   #pitch{width:100%;height:150px;display:block;background:#fbf8f2;border-radius:8px}
   #detected{display:flex;align-items:center;gap:10px;margin-top:8px;min-height:40px}
   #detTone{font-size:24px;font-weight:700;min-width:76px}
@@ -54,6 +55,34 @@
   input[type=range]{width:100%}
   details summary{cursor:pointer;font-size:14px;color:var(--muted);font-weight:600}
   .tip{font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0 0}
+  /* tutorial coach bubble: bottom of the stage on wide screens, top on phones (the "Say" bar is at the bottom there) */
+  /* in-game pause / restart buttons, top-right of the play area */
+  #gameCtl{position:absolute;top:10px;right:10px;display:flex;gap:8px;z-index:6}
+  #gameCtl.hidden{display:none}
+  .ctl{width:42px;height:42px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,253,248,.92);color:#2b2a28;fill:#2b2a28;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+  .ctl:hover{background:#fff}
+  .ctl:active{transform:scale(.94)}
+  @media (max-width:700px){ .ctl{width:44px;height:44px} }
+  /* wide: floats to the right of the bird, above or below the glowing card (placed by positionCoach) */
+  #coach{position:absolute;left:28%;right:12px;bottom:13%;
+    background:rgba(255,253,248,.97);border:2px solid #f08c00;border-radius:14px;padding:10px 16px 4px;
+    box-shadow:0 6px 20px rgba(0,0,0,.18);font-size:15px;line-height:1.55;text-align:center;z-index:5}
+  /* phones: sits right under the play area so it never covers the bird or the cards */
+  #stageWrap.narrow #coach{position:static;border-width:3px 0 0;border-radius:0;box-shadow:none;padding:10px 14px 4px;font-size:14.5px}
+  #coach.hidden{display:none}
+  #coach .say{font-size:22px;font-weight:700}
+  #coach small{color:var(--muted);font-size:12.5px}
+  #coachSkip{font-size:12px;padding:4px 8px;margin:2px 0 0}
+  .tips{text-align:left;margin:10px auto;max-width:420px;padding-left:20px;font-size:15px;line-height:1.6}
+  .tips li{margin:4px 0}
+  .bigScore{font-size:56px;font-weight:800;line-height:1.1;margin:4px 0 0;color:var(--ink)}
+  .bigScore small{display:block;font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.5px}
+  .row.main button{flex:1;min-width:140px;padding:12px 16px}
+  button.share{background:#f08c00}
+  button.link{background:none;color:var(--muted);text-decoration:underline;padding:8px;margin-top:6px;font-size:14px}
+  #shareMsg{min-height:20px;font-size:13px;color:#2f9e44;margin:6px 0 0}
+  #shareText{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--line);resize:none}
   table.stats{margin:10px auto 0;border-collapse:collapse;font-size:14px}
   table.stats td,table.stats th{padding:4px 10px;border-bottom:1px solid var(--line)}
   html{-webkit-text-size-adjust:100%}
@@ -96,6 +125,11 @@
   <section>
     <div id="stageWrap">
       <canvas id="game"></canvas>
+      <div id="gameCtl" class="hidden">
+        <button id="pauseBtn" class="ctl"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+        <button id="restartBtn" class="ctl"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
+      </div>
+      <div id="coach" class="hidden"><div id="coachText"></div><button class="link" id="coachSkip"></button></div>
       <div id="overlay">
         <div class="dialog" id="dlg"></div>
       </div>
@@ -105,7 +139,7 @@
   <aside>
     <div class="card" id="micCard">
       <button id="micBtn"></button>
-      <div id="level"><div id="levelBar"></div></div>
+      <div id="level"><div id="levelBar"></div><div id="gateMark"></div></div>
       <div id="micStatus"></div>
     </div>
 
@@ -124,8 +158,8 @@
 
     <details class="card" id="settingsCard">
       <summary data-i18n="settings"></summary>
-      <label class="sl"><span data-i18n="sGate"></span><output id="o_gate"></output></label>
-      <input type="range" id="s_gate" min="0.003" max="0.08" step="0.001">
+      <label class="sl"><span data-i18n="sSens"></span><output id="o_sens"></output></label>
+      <input type="range" id="s_sens" min="1" max="10" step="1">
       <label class="sl"><span data-i18n="sFlat"></span><output id="o_flat"></output></label>
       <input type="range" id="s_flat" min="0.8" max="4" step="0.1">
       <label class="sl"><span data-i18n="sMin"></span><output id="o_min"></output></label>
@@ -154,11 +188,11 @@ const I18N = {
     recent:'최근 4초', lastSyl:'직전 음절',
     keysTitle:'마이크가 없을 때: 버튼 / 키보드',
     settings:'인식 설정 (인식이 잘 안 될 때 조정)',
-    sGate:'음량 기준',
+    sSens:'마이크 감도 (높을수록 멀리서도 인식)',
     sFlat:'평탄 기준 (반음 · 높을수록 1성으로 판정되기 쉬움)',
     sMin:'이보다 짧은 소리는 무시 (ms · 잡음 방지)',
     sEnd:'음절이 끝났다고 보는 멈춤 길이 (ms)',
-    tip:'소리 크기가 아니라 음높이의 모양으로 판별해요. 1성은 높고 평평하게, 2성은 올라가게, 3성은 내려갔다 올라오게, 4성은 높은 데서 뚝 떨어지게 말하세요.',
+    tip:'소리 크기가 아니라 음높이의 모양으로 판별해요. 1성은 높고 평평하게, 2성은 올라가게, 3성은 내려갔다 올라오게, 4성은 높은 데서 뚝 떨어지게 말하세요. 주변 소음에 맞춰 기준이 자동으로 조정돼요. 음량 막대의 검은 선을 넘으면 목소리로 인식해요.',
     toneName:n=>`${n}성`,
     action:{1:'앞으로 돌진 (얼음벽 깨기)',2:'한 칸 위로',3:'내려갔다 올라오기 (바위 밑 통과)',4:'한 칸 아래로'},
     moveShort:{1:'돌진해서 얼음벽 깨기',2:'위로 한 칸',3:'바위 밑으로 통과',4:'아래로 한 칸'},
@@ -174,7 +208,30 @@ const I18N = {
     thTone:'성조', thSaid:'말한 횟수', thOk:'목표 글자 정답',
     overTip:'정답이 가장 적은 성조를 더 연습해 보세요.',
     again:'다시 하기', menu:'메뉴로',
+    scoreLabel:'점수', bestStreak:b=>`최장 연속 ${b}개`,
+    share:'친구에게 공유',
+    shareText:(s,b)=>`Tone Bird에서 ${s}점 받았어요! 🐦 (최장 연속 ${b}개) 중국어 성조, 너도 도전해 봐!`,
+    copied:'복사됐어요! 메신저에 붙여넣어 친구에게 보내세요.',
+    copyManual:'아래 글을 복사해서 친구에게 보내세요.',
+    cardTagline:'중국어 성조 연습 게임', cardAcc:'성조별 정답',
+    menuTiming:'⏱ <b>읽는 타이밍:</b> 카드 테두리가 <b>반짝이기 시작하면 바로</b> 읽으세요. 늦어도 새가 닿기 1초 전(시간 막대의 빨간 선)에는 읽기 시작해야 해요.',
+    tutorial:'튜토리얼', tutorialRec:'처음이라면 1분짜리 튜토리얼부터 해 보세요.', tutorialAgain:'튜토리얼 다시 보기',
+    shape:{1:'높고 평평하게',2:'아래에서 위로 올리며',3:'내려갔다가 다시 올리며',4:'위에서 뚝 떨어뜨리며'},
+    tutIntro:'새는 저절로 앞으로 날아가요.<br>오른쪽에서 글자 카드가 다가오면 알려 줄게요.',
+    tutNow1:'테두리가 <b>반짝이는 카드</b>가 지금 읽을 글자예요.<br><b>반짝이기 시작하면 바로 읽으세요!</b>',
+    tutNow2:'다음 카드가 반짝이기 시작했어요. <b>바로 지금이 읽을 타이밍이에요.</b><br><small>앞 장애물을 지나면 다음 카드가 곧바로 반짝여요.</small>',
+    tutNoFreeze:'이제부터는 멈추지 않아요! 반짝이면 바로 읽으세요.<br><small>안내 막대 아래 시간 막대가 빨간 선에 닿기 전에 읽기 시작해야 해요.</small>',
+    tutKeep:'반짝여요, 바로 읽기!',
+    tutWait:(k)=>`<small>읽을 때까지 기다릴게요. 마이크가 없으면 키보드 ${k}${(k===1||k===3)?'을':'를'} 누르세요.</small>`,
+    tutGood:'좋아요! 👍 새가 움직였죠?', tutGoodTime:'완벽한 타이밍이에요! 👍',
+    tutLate:'성공! 하지만 조금 늦었어요. 반짝이자마자 읽으면 훨씬 여유 있어요.',
+    tutMiss:'괜찮아요, 연습이라 하트가 줄지 않아요. 다음 카드는 반짝이자마자 읽어 보세요.',
+    tutWrong:(heard,need,shape)=>`${heard}으로 들렸어요. ${need}은 <b>${shape}</b> 읽어요. 다시 한번!`,
+    tutDoneTitle:'튜토리얼 완료! 🎉',
+    tutDoneTips:['카드 테두리가 <b>반짝이기 시작하면</b> 그때가 읽을 타이밍이에요.','늦어도 새가 닿기 <b>1초 전</b>(시간 막대의 빨간 선)에는 읽기 시작하세요.','한 번에 한 글자씩 또박또박 읽고 잠깐 멈추세요.'],
+    skipTut:'튜토리얼 건너뛰기',
     pauseTitle:'일시정지', pauseP:'일시정지 중에도 말하면서 성조 인식을 연습할 수 있어요.', resume:'계속하기',
+    pauseBtn:'일시정지 (스페이스바)', restartBtn:'처음부터 다시 (R)', restart:'처음부터 다시',
   },
   en: {
     title:'Tone Bird',
@@ -188,11 +245,11 @@ const I18N = {
     recent:'Last 4 s', lastSyl:'Last syllable',
     keysTitle:'No microphone? Buttons / keyboard',
     settings:'Recognition settings (adjust if detection is off)',
-    sGate:'Volume threshold',
+    sSens:'Mic sensitivity (higher = works from farther away)',
     sFlat:'Level-tone threshold (semitones · higher = more Tone 1)',
     sMin:'Ignore sounds shorter than (ms · filters noise)',
     sEnd:'Pause that ends a syllable (ms)',
-    tip:'Detection uses the shape of your pitch, not loudness. Tone 1: high and level. Tone 2: rising. Tone 3: dips low, then rises. Tone 4: falls sharply from high.',
+    tip:'Detection uses the shape of your pitch, not loudness. Tone 1: high and level. Tone 2: rising. Tone 3: dips low, then rises. Tone 4: falls sharply from high. The threshold adapts to background noise automatically; anything past the black line on the level bar counts as voice.',
     toneName:n=>`Tone ${n}`,
     action:{1:'Dash forward (smash ice walls)',2:'Fly up one lane',3:'Dip down and back (pass under rocks)',4:'Fly down one lane'},
     moveShort:{1:'dash and smash ice walls',2:'fly up one lane',3:'dip under rocks',4:'fly down one lane'},
@@ -208,7 +265,30 @@ const I18N = {
     thTone:'Tone', thSaid:'Times said', thOk:'Correct on target',
     overTip:'Practice the tone with the fewest correct answers.',
     again:'Play again', menu:'Menu',
+    scoreLabel:'SCORE', bestStreak:b=>`Best streak: ${b}`,
+    share:'Share with friends',
+    shareText:(s,b)=>`I scored ${s} in Tone Bird! 🐦 (best streak ${b}) Can you beat me at Mandarin tones?`,
+    copied:'Copied! Paste it into a chat to send to your friends.',
+    copyManual:'Copy the text below and send it to your friends.',
+    cardTagline:'Mandarin tone practice game', cardAcc:'Correct by tone',
+    menuTiming:'⏱ <b>When to speak:</b> read a card <b>as soon as its border starts glowing</b>. Start no later than 1 second before the bird reaches it (the red tick on the timer bar).',
+    tutorial:'Tutorial', tutorialRec:'First time? Try the 1-minute tutorial first.', tutorialAgain:'Replay tutorial',
+    shape:{1:'high and level',2:'rising from low to high',3:'dipping down, then back up',4:'dropping sharply from high'},
+    tutIntro:'The bird flies forward by itself.<br>I\'ll tell you when a word card comes in from the right.',
+    tutNow1:'The card with the <b>glowing border</b> is the one to read.<br><b>Read it as soon as it starts glowing!</b>',
+    tutNow2:'The next card just started glowing. <b>That is your moment to read it.</b><br><small>As soon as you pass an obstacle, the next card lights up.</small>',
+    tutNoFreeze:'From now on the game won\'t stop! Read as soon as a card glows.<br><small>Start before the timer bar under the "Say:" box reaches the red tick.</small>',
+    tutKeep:'It\'s glowing: read it now!',
+    tutWait:(k)=>`<small>I'll wait until you read it. No microphone? Press key ${k}.</small>`,
+    tutGood:'Nice! 👍 See the bird move?', tutGoodTime:'Perfect timing! 👍',
+    tutLate:'Made it, but a little late. Reading the moment it glows gives you plenty of time.',
+    tutMiss:'No problem: hearts don\'t drop in practice. Read the next card the moment it glows.',
+    tutWrong:(heard,need,shape)=>`That sounded like ${heard}. ${need} goes <b>${shape}</b>. Try again!`,
+    tutDoneTitle:'Tutorial complete! 🎉',
+    tutDoneTips:['When a card\'s border <b>starts glowing</b>, that\'s your cue to read it.','Start reading no later than <b>1 second</b> before the bird reaches it (the red tick on the timer bar).','Read one syllable at a time, clearly, then pause briefly.'],
+    skipTut:'Skip tutorial',
     pauseTitle:'Paused', pauseP:'You can keep speaking while paused to practice tone detection.', resume:'Resume',
+    pauseBtn:'Pause (Space)', restartBtn:'Restart (R)', restart:'Restart',
   },
 };
 let lang = 'en';
@@ -245,13 +325,18 @@ const CF = '"PingFang SC","Microsoft YaHei","Noto Sans SC","Apple SD Gothic Neo"
 /* ============================================================
    Recognition settings
    ============================================================ */
-const cfg = { gate:0.012, flat:1.6, minMs:100, endMs:160 };
+const cfg = { sens:7, flat:1.6, minMs:100, endMs:160 };
+// Adaptive voice gate: track the background-noise level and treat anything clearly above it as voice.
+// Sensitivity 1 → voice must be 5× the noise; 10 → 1.6×.
+let noiseFloor = 0.002, gate = 0.006;
+const gateMult = () => 5 - (cfg.sens-1)*(3.4/9);
+function updateGate(){ gate = Math.min(0.05, Math.max(0.0015, noiseFloor*gateMult())); }
 function bindSlider(id, key, fmt){
   const s=document.getElementById('s_'+id), o=document.getElementById('o_'+id);
   s.value=cfg[key]; o.textContent=fmt(cfg[key]);
   s.oninput=()=>{cfg[key]=parseFloat(s.value); o.textContent=fmt(cfg[key]);};
 }
-bindSlider('gate','gate',v=>v.toFixed(3));
+bindSlider('sens','sens',v=>v+'');
 bindSlider('flat','flat',v=>v.toFixed(1));
 bindSlider('min','minMs',v=>v+'');
 bindSlider('end','endMs',v=>v+'');
@@ -297,11 +382,16 @@ function yin(buf, sr){
   // cumulative mean normalized difference
   yinD[0]=1; let run=0;
   for(let tau=1; tau<=maxTau; tau++){ run+=yinD[tau]; yinD[tau]=run? yinD[tau]*tau/run : 1; }
+  // First dip under 0.2 (standard YIN). A voice farther from the mic carries more room echo and
+  // noise, so if nothing clears 0.2, accept the deepest dip as long as it is still clearly periodic.
   let tau=-1;
   for(let t=minTau; t<=maxTau; t++){
-    if(yinD[t]<0.15){ while(t+1<=maxTau && yinD[t+1]<yinD[t]) t++; tau=t; break; }
+    if(yinD[t]<0.2){ while(t+1<=maxTau && yinD[t+1]<yinD[t]) t++; tau=t; break; }
   }
-  if(tau<0) return null;
+  if(tau<0){
+    let best=minTau; for(let t=minTau+1; t<=maxTau; t++) if(yinD[t]<yinD[best]) best=t;
+    if(yinD[best]<0.32) tau=best; else return null;
+  }
   // parabolic interpolation
   let bt=tau;
   if(tau>1 && tau<maxTau){
@@ -320,11 +410,16 @@ function renderMic(){
 micBtn.onclick = async ()=>{
   if(micOn) return;
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    // Auto gain lifts a quiet / distant voice; noise suppression removes steady fan or traffic hum.
+    // Neither changes pitch, which is all the tone detector looks at.
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}});
     audioCtx = new (window.AudioContext||window.webkitAudioContext)();
     const src = audioCtx.createMediaStreamSource(stream);
+    // Keep only the voice-pitch band: cut rumble below 70 Hz and hiss above 1.5 kHz
+    const hp = audioCtx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=70;
+    const lp = audioCtx.createBiquadFilter(); lp.type='lowpass';  lp.frequency.value=1500;
     analyser = audioCtx.createAnalyser(); analyser.fftSize=2048;
-    src.connect(analyser);
+    src.connect(hp); hp.connect(lp); lp.connect(analyser);
     abuf = new Float32Array(analyser.fftSize);
     micOn=true; micErrMsg=null;
   }catch(e){
@@ -339,13 +434,24 @@ const recent=[];          // pitch points from the last few seconds (live plot)
 let lastContour=null;     // contour of the last syllable
 function processAudio(now){
   analyser.getFloatTimeDomainData(abuf);
-  let rms=0; for(let i=0;i<abuf.length;i++) rms+=abuf[i]*abuf[i];
-  rms=Math.sqrt(rms/abuf.length);
+  processFrame(abuf, audioCtx.sampleRate, now);
+}
+function processFrame(buf, sr, now){
+  let rms=0; for(let i=0;i<buf.length;i++) rms+=buf[i]*buf[i];
+  rms=Math.sqrt(rms/buf.length);
   level = level*0.7 + rms*0.3;
+  updateGate();
   let st=null;
-  if(rms>cfg.gate){
-    const f=yin(abuf, audioCtx.sampleRate);
+  if(rms>gate){
+    const f=yin(buf, sr);
     if(f && f>70 && f<550) st = 12*Math.log2(f/55);   // semitone scale
+  }
+  // Learn the background level while nobody is speaking: drop quickly to quieter levels,
+  // rise slowly (so a long syllable is never mistaken for noise). Steady non-voice sound
+  // above the gate (a fan, traffic) also slowly raises the floor.
+  if(!seg.active && st===null){
+    const rate = rms < noiseFloor ? 0.2 : (rms < gate ? 0.02 : 0.004);
+    noiseFloor = Math.min(0.02, Math.max(0.0003, noiseFloor + (rms-noiseFloor)*rate));
   }
   if(st!==null){
     recent.push({t:now, st});
@@ -459,6 +565,7 @@ function layout(){
   let h = cssH/s;
   if(h < 400){ s = cssH/400; h = 400; w = cssW/s; }   // short landscape phones: zoom out instead
   W = Math.round(w); H = Math.round(h); NARROW = tall;
+  stageWrap.classList.toggle('narrow', NARROW);
   GROUND = H - (NARROW ? 74 : 50);
   LANE_H = (GROUND-TOP)/LANES;
   BX = Math.round(Math.max(90, Math.min(170, W*0.21)));
@@ -497,10 +604,17 @@ function fit(o, L){
 }
 function spawn(){
   const o={ tone:pick([1,2,2,3,3,4,4]), x:game.nextX, passed:false, answered:false };
+  if(tut){                                   // tutorial: a fixed, short sequence covering every tone
+    if(tut.spawned>=TUT_SEQ.length){ game.nextX=Infinity; return; }
+    o.tone=TUT_SEQ[tut.spawned]; o.tutIdx=tut.spawned++;
+  }
   game.expLane = fit(o, game.expLane);
   game.obs.push(o);
-  game.nextX += 320 + Math.random()*80;
+  game.nextX += tut ? 380 : 320 + Math.random()*80;
 }
+// seconds until the bird reaches obstacle o at normal speed
+const remOf = o => (o.x - game.dist - (BX+BR)) / (speedBase || 1);
+const LATE_S = 1.0;   // start reading at least this long before the bird arrives
 // When an obstacle becomes the current target, re-fit it and everything after it to the bird's real lane
 function replanFrom(o){
   let Ln=game.bird.lane, started=false;
@@ -546,8 +660,17 @@ function applyTone(tone, source, info){
   game.stats[tone][0]++;
   if(tgt && !tgt.answered){
     const wd=`${tgt.word[0]} ${tgt.word[1]} = ${meaning(tgt.word)}`;
-    if(tgt.tone===tone){ tgt.answered=true; game.stats[tone][1]++; floatText('✓ '+wd, T.color); }
-    else floatText(L().need(toneName(tgt.tone), `${tgt.word[0]} ${tgt.word[1]}`), '#2b2a28');
+    if(tgt.tone===tone){
+      tgt.answered=true; game.stats[tone][1]++; floatText('✓ '+wd, T.color);
+      if(tut){
+        const wasFrozen=tut.frozen; tut.frozen=false;
+        coach(wasFrozen ? L().tutGood : (remOf(tgt) < LATE_S ? L().tutLate : L().tutGoodTime));
+      }
+    } else {
+      floatText(L().need(toneName(tgt.tone), `${tgt.word[0]} ${tgt.word[1]}`), '#2b2a28');
+      // tutorial pause: a wrong tone doesn't move the bird, it just explains and waits for another try
+      if(tut && tut.frozen){ coach(L().tutWrong(toneName(tone), toneName(tgt.tone), L().shape[tgt.tone]) + coachWord(tgt)); return; }
+    }
   }
 
   if(tone===2){ if(b.lane>0) b.lane--; }
@@ -580,7 +703,13 @@ function update(dt){
   if(b.dashObj){ if(b.dashObj.broken || b.dashObj.passed) b.dashObj=null; else b.dashT=Math.max(b.dashT,0.3); }
   const tgtNow=currentTarget();
   if(tgtNow!==g.targetRef){ g.targetRef=tgtNow; if(tgtNow) replanFrom(tgtNow); }
-  const speed = speedBase * (b.dashT>0 ? 1.9 : 1);
+  // The target card "lights up" once it is fully on screen: that is the moment to read it
+  if(tgtNow && tgtNow.litRem==null && tgtNow.x-g.dist <= W-tgtNow.w-10){
+    tgtNow.litRem = remOf(tgtNow);
+    if(tut) tutOnLit(tgtNow);
+  }
+  if(tut && g.tutEndAt && g.t>g.tutEndAt){ finishTutorial(false); return; }
+  const speed = (tut && tut.frozen) ? 0 : speedBase * (b.dashT>0 ? 1.9 : 1);
   g.dist += speed*dt;
   while(g.nextX < g.dist + W + 80) spawn();
 
@@ -600,6 +729,9 @@ function update(dt){
     for(const R of rectsOf(o,sx)){
       if(hitCircle(BX,b.y,BR,R)){
         if(o.type==='glass' && b.dashT>0){ o.broken=true; burst(sx+o.w/2,b.y,'#9ad8f0',24); floatText(L().smash,'#1c7ed6'); }
+        else if(g.inv<=0 && tut){            // tutorial: no hearts lost, just a tip
+          g.inv=1.2; o.hit=true; burst(BX,b.y,'#e5484d',10); coach(L().tutMiss);
+        }
         else if(g.inv<=0){
           g.hearts--; g.inv=1.6; g.shake=0.35; g.streak=0; o.hit=true;
           burst(BX,b.y,'#e5484d',16);
@@ -610,6 +742,7 @@ function update(dt){
     if(!o.passed && sx+o.w < BX-BR){
       o.passed=true;
       if(!o.hit){ g.score++; g.streak++; g.best=Math.max(g.best,g.streak); }
+      if(tut && o.tutIdx===TUT_SEQ.length-1) g.tutEndAt=g.t+0.9;
     }
   }
   g.obs = g.obs.filter(o=>o.x-g.dist+o.w>-40);
@@ -626,7 +759,7 @@ function rr(x,y,w,h,r){ ctx.beginPath(); ctx.roundRect(x,y,w,h,r); }
 function draw(){
   const g=game, b=g.bird;
   ctx.save();
-  if(g.shake>0) ctx.translate((Math.random()-0.5)*8,(Math.random()-0.5)*8);
+  if(g.shake>0 && state==='play') ctx.translate((Math.random()-0.5)*8,(Math.random()-0.5)*8);
   // sky
   const sky=ctx.createLinearGradient(0,0,0,GROUND);
   sky.addColorStop(0,'#9fd3ef'); sky.addColorStop(1,'#e4f4fb');
@@ -673,10 +806,13 @@ function draw(){
     // word card: character + pinyin
     if(!o.passed){
       const cx=sx+o.w/2, cy= o.type==='gate' ? laneY(o.gap) : laneY(o.type==='glass' ? o.fromLane : o.lane);
-      const isT = o===tgt;
-      ctx.globalAlpha = isT?1:0.75;
+      const isT = o===tgt, lit = isT && o.litRem!=null && !o.answered;
+      ctx.globalAlpha = isT?1:0.6;
+      // the card to read now pulses with a glow; later cards stay dim
+      if(lit){ ctx.shadowColor=col; ctx.shadowBlur=6+14*(0.5+0.5*Math.sin(g.t*8)); }
       ctx.fillStyle='#fffdf8'; rr(cx-30,cy-26,60,52,10); ctx.fill();
-      ctx.lineWidth=isT?3:1.5; ctx.strokeStyle=o.answered?'#2f9e44':col; ctx.stroke();
+      ctx.lineWidth=lit?4:(isT?3:1.5); ctx.strokeStyle=o.answered?'#2f9e44':col; ctx.stroke();
+      ctx.shadowBlur=0;
       ctx.fillStyle='#2b2a28'; ctx.font='bold 24px '+CF; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(o.word[0],cx,cy-6);
       ctx.fillStyle=col; ctx.font='bold 13px '+CF; ctx.fillText(o.word[1],cx,cy+15);
@@ -729,11 +865,26 @@ function drawTargetHUD(tgt){
   let total=0; for(const p of parts){ ctx.font=p.font; p.w=ctx.measureText(p.text).width; total+=p.w; }
   const bh=Math.round(40*k);
   // wide: top-right corner; narrow: centred on the ground strip so it never covers the score
-  const x0 = NARROW ? (W-total-24)/2 : W-12-total-24;
+  // on wide screens leave room for the pause / restart buttons in the top-right corner
+  const ctlW = (gameCtl.offsetWidth || 92) / (cv.clientWidth / W) + 10;
+  const x0 = NARROW ? (W-total-24)/2 : W-12-total-24-ctlW;
   const y0 = NARROW ? GROUND + (H-GROUND-bh)/2 + 3 : 12;
-  ctx.fillStyle='rgba(255,253,248,.94)'; rr(x0,y0,total+24,bh,10); ctx.fill();
+  const bw=total+24, showBar = tgt.litRem!=null && !tgt.answered;
+  const boxH = bh + (showBar ? 10 : 0);
+  const yBox = NARROW ? y0 - (showBar?5:0) : y0;
+  ctx.fillStyle='rgba(255,253,248,.94)'; rr(x0,yBox,bw,boxH,10); ctx.fill();
   let x=x0+12;
-  for(const p of parts){ ctx.font=p.font; ctx.fillStyle=p.color; ctx.fillText(p.text,x,y0+bh/2); x+=p.w; }
+  for(const p of parts){ ctx.font=p.font; ctx.fillStyle=p.color; ctx.fillText(p.text,x,yBox+bh/2); x+=p.w; }
+  // time left until the bird reaches the card: green → orange → red; the red tick marks "start reading by here"
+  if(showBar){
+    const rem=Math.max(0,remOf(tgt)), frac=Math.min(1, rem/Math.max(0.1,tgt.litRem));
+    const bx=x0+10, by=yBox+bh+1, bwid=bw-20;
+    ctx.fillStyle='#ece6da'; rr(bx,by,bwid,5,3); ctx.fill();
+    ctx.fillStyle = rem>2 ? '#2f9e44' : rem>LATE_S ? '#f08c00' : '#e5484d';
+    if(frac>0){ rr(bx,by,Math.max(5,bwid*frac),5,3); ctx.fill(); }
+    const lx = bx + bwid*Math.min(1, LATE_S/Math.max(0.1,tgt.litRem));
+    ctx.fillStyle='#e5484d'; ctx.fillRect(lx-1,by-2,2,9);
+  }
 }
 function drawBird(x,y,tilt,dash){
   ctx.save(); ctx.translate(x,y); ctx.rotate(tilt);
@@ -750,51 +901,191 @@ function drawBird(x,y,tilt,dash){
 /* ---------- Menu / pause / game-over dialogs ---------- */
 const overlay=document.getElementById('overlay'), dlg=document.getElementById('dlg');
 function showMenu(){
+  endTutorialMode();
   state='menu'; overlay.classList.remove('hidden');
   const moves=[1,2,3,4].map(t=>`<b style="color:${TONES[t].color}">${toneName(t)} ${TONES[t].icon}</b><span>${L().moveShort[t]}</span>`).join('');
+  const first = !tutDone();
   dlg.innerHTML=`<h2>${L().title}</h2>
     <p>${L().menuP1}</p>
     <div class="moves">${moves}</div>
     <p>${L().menuP2}</p>
+    <p>${L().menuTiming}</p>
     <p>${L().menuP3}</p>
+    ${first ? `<p><b>${L().tutorialRec}</b></p>` : ''}
     <div class="row">
+      ${first ? `<button class="share" id="tutB">▶ ${L().tutorial}</button>` : ''}
       <select id="spd"><option value="80">${L().slow}</option><option value="110">${L().mid}</option><option value="145">${L().fast}</option></select>
-      <button id="go">${L().start}</button>
-    </div>`;
+      <button id="go" class="${first?'ghost':''}">${L().start}</button>
+    </div>
+    ${first ? '' : `<button class="link" id="tutB">${L().tutorialAgain}</button>`}`;
   document.getElementById('spd').value=speedBase;
   document.getElementById('go').onclick=start;
+  document.getElementById('tutB').onclick=startTutorial;
 }
 function start(){
+  endTutorialMode();
   const s=document.getElementById('spd'); if(s) speedBase=+s.value;
   newGame(); state='play'; overlay.classList.add('hidden');
 }
+
+/* ---------- Tutorial: teaches WHEN to read the next card ---------- */
+const TUT_SEQ=[2,4,1,3,2], TUT_FREEZE=2, TUT_SPEED=80;   // first 2 cards pause the game until read
+let tut=null, speedBeforeTut=110;
+const coachEl=document.getElementById('coach'), coachText=document.getElementById('coachText'), coachSkip=document.getElementById('coachSkip');
+function tutDone(){ try{ return localStorage.getItem('toneBirdTutDone')==='1'; }catch(e){ return false; } }
+function setTutDone(){ try{ localStorage.setItem('toneBirdTutDone','1'); }catch(e){} }
+function coach(html){
+  if(!html){ coachEl.classList.add('hidden'); return; }
+  coachText.innerHTML=html; coachSkip.textContent=L().skipTut; coachEl.classList.remove('hidden');
+}
+const coachWord = o => `<br><span class="say"><span class="zh" lang="zh-CN">${o.word[0]}</span> <span style="color:${TONES[o.tone].color}">${o.word[1]}</span></span>
+  <small>(${meaning(o.word)})</small> · <b style="color:${TONES[o.tone].color}">${toneName(o.tone)} ${TONES[o.tone].icon}</b> <small>${L().shape[o.tone]}</small>`;
+function startTutorial(){
+  const s=document.getElementById('spd'); speedBeforeTut = s ? +s.value : speedBase;
+  tut={spawned:0, frozen:false};
+  speedBase=TUT_SPEED; newGame(); state='play'; overlay.classList.add('hidden');
+  coach(L().tutIntro);
+}
+function tutOnLit(o){
+  if(o.answered) return;
+  if(o.tutIdx < TUT_FREEZE){
+    tut.frozen=true;
+    coach((o.tutIdx===0 ? L().tutNow1 : L().tutNow2) + coachWord(o) + '<br>' + L().tutWait(o.tone));
+  } else {
+    coach((o.tutIdx===TUT_FREEZE ? L().tutNoFreeze : L().tutKeep) + coachWord(o));
+  }
+}
+function endTutorialMode(){
+  if(tut){ tut=null; speedBase=speedBeforeTut; }
+  coach('');
+}
+function finishTutorial(){
+  endTutorialMode(); setTutDone();
+  state='tutdone'; renderTutDone();
+}
+function renderTutDone(){
+  overlay.classList.remove('hidden');
+  dlg.innerHTML=`<h2>${L().tutDoneTitle}</h2>
+    <ul class="tips">${L().tutDoneTips.map(t=>`<li>${t}</li>`).join('')}</ul>
+    <div class="row main"><button id="go">▶ ${L().start}</button><button class="ghost" id="tutB">${L().tutorialAgain}</button></div>`;
+  document.getElementById('go').onclick=start;
+  document.getElementById('tutB').onclick=startTutorial;
+}
+coachSkip.onclick=()=>finishTutorial();
+// Wide screens: keep the bubble right of the bird and in the half of the screen away from the glowing card
+function positionCoach(){
+  if(NARROW || coachEl.classList.contains('hidden')) return;
+  const s = cv.clientWidth / W, t = game.targetRef;
+  const cardY = t ? (t.type==='gate' ? laneY(t.gap) : laneY(t.type==='glass' ? t.fromLane : t.lane)) : H*0.7;
+  coachEl.style.left = Math.round((BX+BR+18)*s)+'px';
+  if(cardY > H/2){ coachEl.style.top = Math.round(58*s)+'px'; coachEl.style.bottom = 'auto'; }
+  else { coachEl.style.bottom = Math.round((H-GROUND+8)*s)+'px'; coachEl.style.top = 'auto'; }
+}
 function gameOver(){
-  state='over'; renderOver();
+  state='over'; game.shake=0; game.inv=0; renderOver();
 }
 function renderOver(){
   overlay.classList.remove('hidden');
   const rows=[1,2,3,4].map(t=>{ const [said,ok]=game.stats[t]; return `<tr><td style="color:${TONES[t].color};font-weight:700">${toneName(t)}</td><td>${said}</td><td>${ok}</td></tr>`; }).join('');
-  dlg.innerHTML=`<h2>${L().overTitle}</h2><p>${L().overScore(game.score, game.best)}</p>
+  dlg.innerHTML=`<h2>${L().overTitle}</h2>
+    <div class="bigScore"><small>${L().scoreLabel}</small>${game.score}</div>
+    <p>${L().bestStreak(game.best)}</p>
     <table class="stats"><tr><th>${L().thTone}</th><th>${L().thSaid}</th><th>${L().thOk}</th></tr>${rows}</table>
     <p>${L().overTip}</p>
-    <div class="row"><button id="again">${L().again}</button><button class="ghost" id="menuB">${L().menu}</button></div>`;
+    <div class="row main"><button id="again">↻ ${L().again}</button><button class="share" id="shareB">↗ ${L().share}</button></div>
+    <p id="shareMsg"></p>
+    <button class="link" id="menuB">${L().menu}</button>`;
   document.getElementById('again').onclick=()=>{ newGame(); state='play'; overlay.classList.add('hidden'); };
+  document.getElementById('shareB').onclick=shareScore;
   document.getElementById('menuB').onclick=showMenu;
+  // build the image now so the share sheet can open immediately on tap (Safari requires that)
+  scoreImg=null; makeScoreImage().then(b=>{ scoreImg=b; });
+}
+let scoreImg=null;
+
+/* ---------- Sharing the score ---------- */
+function shareUrl(){ return /^https?:$/.test(location.protocol) ? location.href.split('#')[0] : ''; }
+// A small score card image for chat apps (only used where the share sheet accepts images)
+function makeScoreImage(){
+  const c=document.createElement('canvas'); c.width=720; c.height=420;
+  const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,420); g.addColorStop(0,'#9fd3ef'); g.addColorStop(1,'#e4f4fb');
+  x.fillStyle=g; x.fillRect(0,0,720,420);
+  x.fillStyle='#c7e3d4'; x.beginPath(); x.moveTo(0,420);
+  for(let px0=0; px0<720; px0+=240) x.quadraticCurveTo(px0+120,300,px0+240,420);
+  x.fill();
+  x.fillStyle='rgba(255,253,248,.95)'; x.beginPath(); x.roundRect(40,36,640,348,22); x.fill();
+  x.fillStyle='#2b2a28'; x.font='bold 34px '+CF; x.textBaseline='alphabetic'; x.fillText('Tone Bird 🐦',72,92);
+  x.fillStyle='#7a766e'; x.font='18px '+CF; x.fillText(L().cardTagline,72,122);
+  x.fillStyle='#7a766e'; x.font='bold 16px '+CF; x.fillText(L().scoreLabel,72,172);
+  x.fillStyle='#2b2a28'; x.font='bold 96px '+CF; x.fillText(String(game.score),68,262);
+  x.fillStyle='#7a766e'; x.font='18px '+CF; x.fillText(L().bestStreak(game.best),72,300);
+  // per-tone correct / said
+  x.fillStyle='#7a766e'; x.font='bold 16px '+CF; x.fillText(L().cardAcc,380,172);
+  [1,2,3,4].forEach((t,i)=>{
+    const [said,ok]=game.stats[t], y=196+i*42, frac = said? ok/said : 0;
+    x.fillStyle=TONES[t].color; x.font='bold 18px '+CF; x.fillText(toneName(t),380,y+16);
+    x.fillStyle='#ece6da'; x.beginPath(); x.roundRect(450,y+2,150,16,8); x.fill();
+    if(frac>0){ x.fillStyle=TONES[t].color; x.beginPath(); x.roundRect(450,y+2,Math.max(16,150*frac),16,8); x.fill(); }
+    x.fillStyle='#2b2a28'; x.font='16px '+CF; x.fillText(`${ok}/${said}`,612,y+16);
+  });
+  const url=shareUrl();
+  if(url){ x.fillStyle='#7a766e'; x.font='14px '+CF; x.fillText(url.length>70? url.slice(0,67)+'…' : url,72,362); }
+  return new Promise(res=>c.toBlob(b=>res(b),'image/png'));
+}
+async function shareScore(){
+  const msg=document.getElementById('shareMsg');
+  const text=L().shareText(game.score, game.best), url=shareUrl();
+  const full = url ? `${text} ${url}` : text;
+  try{
+    if(navigator.share){
+      const file = scoreImg && new File([scoreImg],'tone-bird-score.png',{type:'image/png'});
+      if(file && navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({title:'Tone Bird', text:full, files:[file]}); return;
+      }
+      await navigator.share(url ? {title:'Tone Bird', text, url} : {title:'Tone Bird', text}); return;
+    }
+  }catch(e){ if(e && e.name==='AbortError') return; }   // user closed the share sheet
+  // No share sheet (most desktop browsers): copy the text instead
+  try{ await navigator.clipboard.writeText(full); msg.textContent=L().copied; return; }catch(e){}
+  msg.textContent=L().copyManual;
+  if(!document.getElementById('shareText')){
+    msg.insertAdjacentHTML('afterend', `<textarea id="shareText" rows="3" readonly></textarea>`);
+  }
+  const ta=document.getElementById('shareText'); ta.value=full; ta.focus(); ta.select();
 }
 function renderPause(){
   overlay.classList.remove('hidden');
-  dlg.innerHTML=`<h2>${L().pauseTitle}</h2><p>${L().pauseP}</p><div class="row"><button id="res">${L().resume}</button><button class="ghost" id="menuB">${L().menu}</button></div>`;
-  document.getElementById('res').onclick=togglePause; document.getElementById('menuB').onclick=showMenu;
+  dlg.innerHTML=`<h2>${L().pauseTitle}</h2><p>${L().pauseP}</p>
+    <div class="row main"><button id="res">▶ ${L().resume}</button><button class="ghost" id="rst">↻ ${L().restart}</button></div>
+    <button class="link" id="menuB">${L().menu}</button>`;
+  document.getElementById('res').onclick=togglePause;
+  document.getElementById('rst').onclick=restartGame;
+  document.getElementById('menuB').onclick=showMenu;
 }
 function togglePause(){
   if(state==='play'){ state='pause'; renderPause(); }
   else if(state==='pause'){ state='play'; overlay.classList.add('hidden'); }
+}
+// Restart the current run from the beginning (a tutorial restarts the tutorial)
+function restartGame(){
+  if(tut){ const keep=speedBeforeTut; endTutorialMode(); speedBeforeTut=keep; startTutorial(); speedBeforeTut=keep; return; }
+  newGame(); state='play'; overlay.classList.add('hidden');
+}
+const gameCtl=document.getElementById('gameCtl'), pauseBtn=document.getElementById('pauseBtn'), restartBtn=document.getElementById('restartBtn');
+// blur after click so a later Space press doesn't "click" the button again on top of our own Space handler
+pauseBtn.onclick=()=>{ pauseBtn.blur(); togglePause(); };
+restartBtn.onclick=()=>{ restartBtn.blur(); restartGame(); };
+function renderCtlLabels(){
+  pauseBtn.title=L().pauseBtn;     pauseBtn.setAttribute('aria-label', L().pauseBtn);
+  restartBtn.title=L().restartBtn; restartBtn.setAttribute('aria-label', L().restartBtn);
 }
 addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
   const map={'1':1,'2':2,'3':3,'4':4};
   if(e.key in map){ applyTone(map[e.key],'key'); }
   else if(e.code==='Space'){ e.preventDefault(); togglePause(); }
+  else if((e.key==='r'||e.key==='R') && (state==='play'||state==='pause')){ restartGame(); }
   else if(e.key==='Enter' && state==='menu'){ start(); }
 });
 
@@ -805,10 +1096,12 @@ function applyLang(){
   document.title=L().title;
   langSel.value=lang;
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=L()[el.dataset.i18n]; });
-  renderLegend(); renderKeys(); renderMic(); renderDet();
+  renderLegend(); renderKeys(); renderMic(); renderDet(); renderCtlLabels();
   if(state==='menu') showMenu();
   else if(state==='pause') renderPause();
   else if(state==='over') renderOver();
+  else if(state==='tutdone') renderTutDone();
+  if(tut && game.targetRef && game.targetRef.litRem!=null && !game.targetRef.answered) tutOnLit(game.targetRef);
 }
 langSel.onchange=()=>{
   lang=langSel.value;
@@ -817,14 +1110,19 @@ langSel.onchange=()=>{
 };
 
 /* ---------- Main loop ---------- */
+const levelBar=document.getElementById('levelBar'), gateMark=document.getElementById('gateMark');
 let lastT=performance.now();
 function loop(now){
   const dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
   if(micOn) processAudio(now);
-  document.getElementById('levelBar').style.width=Math.min(100,level/0.1*100)+'%';
-  document.getElementById('levelBar').style.background = level>cfg.gate ? '#2f9e44' : '#b9b2a3';
+  // level bar in decibels (-70 dB … -10 dB) so quiet voices still show; black line = current voice threshold
+  const dbPct = v => Math.max(0, Math.min(100, (20*Math.log10(Math.max(v,1e-6))+70)/60*100));
+  levelBar.style.width = dbPct(level)+'%';
+  levelBar.style.background = level>gate ? '#2f9e44' : '#b9b2a3';
+  gateMark.style.left = dbPct(gate)+'%';
   if(state==='play') update(dt);
-  draw(); drawPitch(now);
+  draw(); drawPitch(now); positionCoach();
+  gameCtl.classList.toggle('hidden', state!=='play');
   requestAnimationFrame(loop);
 }
 let resizeTimer=null;
