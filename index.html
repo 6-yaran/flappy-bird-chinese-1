@@ -456,9 +456,13 @@ function processFrame(buf, sr, now){
   if(st!==null){
     recent.push({t:now, st});
     if(!seg.active){ seg.active=true; seg.pts=[]; seg.start=now; }
-    seg.pts.push({t:now, st, rms}); seg.last=now;
+    seg.pts.push({t:now, st, rms}); seg.last=seg.lastPitch=now;
+  } else if(seg.active && rms>gate){
+    // Voice is still sounding but has no clear pitch: usually the creaky low part of Tone 3.
+    // Keep the syllable going instead of cutting it in two (the rising half alone would look like Tone 2).
+    seg.pts.push({t:now, st:null, rms}); seg.last=now;
   }
-  if(seg.active && (now-seg.last>cfg.endMs || now-seg.start>1400)) finishSeg();
+  if(seg.active && (now-seg.last>cfg.endMs || now-seg.lastPitch>450 || now-seg.start>1500)) finishSeg();
   while(recent.length && now-recent[0].t>4000) recent.shift();
 }
 function finishSeg(){
@@ -470,23 +474,65 @@ function finishSeg(){
 /* ---------- Tone classification from pitch-contour shape ---------- */
 const median = a => { const s=[...a].sort((x,y)=>x-y); return s[s.length>>1]; };
 const mean = a => a.reduce((x,y)=>x+y,0)/a.length;
-function classify(pts){
+// The speaker's own pitch range and syllable length, learned from recent syllables.
+// Tone 3 sits at the bottom of a speaker's range; Tone 2 starts from the middle.
+const voiceHist={vals:[], durs:[], n:0};
+function rememberVoice(v, dur){
+  voiceHist.vals.push(...v); if(voiceHist.vals.length>500) voiceHist.vals.splice(0, voiceHist.vals.length-500);
+  voiceHist.durs.push(dur); if(voiceHist.durs.length>12) voiceHist.durs.shift();
+  voiceHist.n++;
+}
+function pct(arr,p){ const s=[...arr].sort((x,y)=>x-y); return s[Math.min(s.length-1, Math.floor(p*s.length))]; }
+// Tone 3 vs Tone 2 for a contour that ends higher than its lowest point. Positive = Tone 3.
+// Uses what listeners use: how late the turning point comes, how far the voice first drops,
+// how long it stays low (often creaky), whether that low point is the speaker's floor, and length.
+function score3(f){
+  let s = 3.0*(f.minPos - 0.42)
+        + 0.6*(Math.min(f.down,4) - 1.0)
+        + 2.5*(f.lowFrac - 0.3)
+        + 3.0*f.creak;
+  if(f.relLow!=null) s += 0.5*(1.5 - Math.max(-2, Math.min(4, f.relLow)));
+  if(f.relDur!=null) s += 1.0*(Math.min(1.6, f.relDur) - 1.05);
+  return s;
+}
+function classify(all){
+  // Keep frames from the first to the last pitched frame. Unpitched frames in between (creak)
+  // are filled with the lower neighbour so the contour keeps its real timing and its low stretch.
+  const f0=all.findIndex(p=>p.st!=null);
+  let f1=all.length-1; while(f1>=0 && all[f1].st==null) f1--;
+  if(f0<0) return null;
+  const span=all.slice(f0, f1+1);
+  const creak = span.filter(p=>p.st==null).length / span.length;
+  const pts = span.map((p,i)=>{
+    if(p.st!=null) return p;
+    let l=i-1; while(span[l].st==null) l--;
+    let r=i+1; while(span[r].st==null) r++;
+    return {t:p.t, rms:p.rms, st:Math.min(span[l].st, span[r].st), filled:true};
+  });
   const dur = pts.length ? pts[pts.length-1].t - pts[0].t + 16 : 0;
-  if(pts.length<4 || dur<cfg.minMs) return null;   // too short (cough, noise): ignore
+  if(pts.length-Math.round(creak*pts.length)<4 || dur<cfg.minMs) return null;   // too short (cough, noise): ignore
   // 1. Drop weak frames at the start/end: the quiet, creaky end of Tone 4 gives the least reliable pitch
   const peak=Math.max(...pts.map(p=>p.rms ?? 1));
   let a=0, b=pts.length-1;
   while(a<b && (pts[a].rms ?? 1) < peak*0.15) a++;
   while(b>a && (pts[b].rms ?? 1) < peak*0.3) b--;
   let body = pts.slice(a, b+1); if(body.length<4) body=pts;
-  // 2. Fix octave errors: walk out from the loudest frame; real pitch can't jump >6 semitones in 16 ms
+  // 2. Fix octave errors: walk out from the most typical frame (the one nearest the median pitch,
+  //    never an outlier); real pitch can't jump >6 semitones in 16 ms
   let v = body.map(p=>p.st);
-  let anchor=0; body.forEach((p,i)=>{ if((p.rms??0)>(body[anchor].rms??0)) anchor=i; });
+  const vMed=median(v);
+  let anchor=0; v.forEach((x,i)=>{ if(Math.abs(x-vMed)<Math.abs(v[anchor]-vMed)) anchor=i; });
   const snap=(x,ref)=>[x,x-12,x+12,x-24,x+24].reduce((best,c)=>Math.abs(c-ref)<Math.abs(best-ref)?c:best);
   for(let i=anchor+1;i<v.length;i++) v[i]=snap(v[i],v[i-1]);
   for(let i=anchor-1;i>=0;i--)       v[i]=snap(v[i],v[i+1]);
   // 3. Median filter removes isolated bad frames
   v = v.map((_,i)=>median(v.slice(Math.max(0,i-2), i+3)));
+  // ...and if the whole syllable landed an octave away from this speaker's usual range, move it back
+  if(voiceHist.n >= 5){
+    const mid=pct(voiceHist.vals,0.5), m=median(v);
+    const shift = m-mid > 8 ? -12 : mid-m > 8 ? 12 : 0;
+    if(shift) v = v.map(x=>x+shift);
+  }
   // 4. If an end wasn't trimmed for being weak, trim 10% there (onset/offset pitch is unstable)
   const cut=Math.floor(v.length*0.1);
   const cutA = a>0 ? 0 : cut, cutB = b<pts.length-1 ? 0 : cut;
@@ -497,17 +543,30 @@ function classify(pts){
   for(let i=0;i<wv.length;i++){ if(wv[i]<wv[mi]) mi=i; if(wv[i]>wv[xi]) xi=i; }
   const mn=wv[mi], mx=wv[xi], range=mx-mn, minPos=mi/(wv.length-1), maxPos=xi/(wv.length-1);
   const down=start-mn, up=end-mn, th3=Math.max(0.9, cfg.flat*0.6);
-  let tone;
+  // speaker-relative features (only once a few syllables have been heard)
+  const known = voiceHist.n >= 5;
+  const spkLow = known ? pct(voiceHist.vals,0.1) : null, spkMid = known ? pct(voiceHist.vals,0.5) : null;
+  const relDur = known ? dur/median(voiceHist.durs) : null;
+  const lowBand = mn + Math.max(0.7, 0.15*up);
+  const lowFrac = wv.filter(x=>x<=lowBand).length / wv.length;
+  const feats = {minPos, maxPos, down, up, lowFrac, creak, relLow: known ? mn-spkLow : null, relDur};
+  let tone, s3=null;
   if(range < cfg.flat) tone=1;
-  else if(minPos>0.2 && minPos<0.85 && down>=th3 && up>=th3 && down>0.3*up) tone=3;
   else {
-    // Tone 2 vs Tone 4: which comes first, the highest or the lowest point?
-    // Tone 4 = peak first, then falls (a small initial rise is fine); Tone 2 = low first, then high
-    const byOrder = maxPos < minPos ? 4 : 2;
-    const byEnds  = end > start ? 2 : 4;
-    tone = byOrder===byEnds ? byOrder : (Math.abs(end-start) > range*0.6 ? byEnds : byOrder);
+    // Does the voice come back up after its lowest point? If not, it is a fall.
+    const rises = up >= Math.max(th3, 0.35*down) && !(maxPos < minPos && minPos > 0.85);
+    if(!rises){
+      tone = 4;
+      // A short, low fall from the middle of the speaker's range (no high start) is a Tone 3 said
+      // without the final rise; Tone 4 starts from the top of the voice.
+      if(known && start <= spkMid && down < 4 && (creak > 0.1 || mn <= spkLow + 0.5)) tone = 3;
+    } else {
+      s3 = score3(feats);
+      tone = s3 > 0.3 ? 3 : 2;
+    }
   }
-  return {tone, contour:wv, dur, range};
+  rememberVoice(wv, dur);
+  return {tone, contour:wv, dur, range, s3, feats};
 }
 
 /* ---------- Live pitch plot ---------- */
